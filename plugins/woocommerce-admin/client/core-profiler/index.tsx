@@ -82,7 +82,7 @@ export type InitializationCompleteEvent = {
 
 export type IntroOptInEvent =
 	| { type: 'INTRO_COMPLETED'; payload: { optInDataSharing: boolean } } // can be true or false depending on whether the user opted in or not
-	| { type: 'INTRO_SKIPPED'; payload: { optInDataSharing: false } }; // always false for now
+	| { type: 'INTRO_SKIPPED'; payload: { optInDataSharing: boolean } };
 
 export type UserProfileEvent =
 	| {
@@ -853,6 +853,7 @@ export const coreProfilerStateMachineDefinition = createMachine( {
 							actions: [
 								'assignOptInDataSharing',
 								'updateTrackingOption',
+								'recordSkipGuidedSetup',
 							],
 						},
 					},

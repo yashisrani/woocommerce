@@ -35,7 +35,7 @@ export const IntroOptIn = ( {
 				onSkip={ () =>
 					sendEvent( {
 						type: 'INTRO_SKIPPED',
-						payload: { optInDataSharing: false },
+						payload: { optInDataSharing: iOptInDataSharing },
 					} )
 				}
 			/>
