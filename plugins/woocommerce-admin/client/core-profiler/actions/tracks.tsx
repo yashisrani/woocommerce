@@ -218,7 +218,6 @@ const recordSkipGuidedSetup = ( context: unknown, _event: IntroOptInEvent ) => {
 	}
 
 	recordEvent( 'coreprofiler_skip_guided_setup', {
-		step: 'intro_opt_in',
 		wc_version: getSetting( 'wcVersion' ),
 	} );
 };
