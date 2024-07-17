@@ -20,7 +20,7 @@ const UnminifyWebpackPlugin = require( './unminify' );
 const {
 	webpackConfig: styleConfig,
 } = require( '@woocommerce/internal-style-build' );
-const WooCommerceDependencyExtractionWebpackPlugin = require( '../../packages/js/dependency-extraction-webpack-plugin/src/index' );
+const WooCommerceDependencyExtractionWebpackPlugin = require( '@woocommerce/dependency-extraction-webpack-plugin/src/index' );
 
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const WC_ADMIN_PHASE = process.env.WC_ADMIN_PHASE || 'development';
@@ -85,7 +85,7 @@ const getEntryPoints = () => {
 		app: './client/index.js',
 	};
 	wcAdminPackages.forEach( ( name ) => {
-		entryPoints[ name ] = `../../packages/js/${ name }`;
+		entryPoints[ name ] = `../../../../packages/js/${ name }`;
 	} );
 	wpAdminScripts.forEach( ( name ) => {
 		entryPoints[ name ] = `./client/wp-admin-scripts/${ name }`;
@@ -207,7 +207,7 @@ const webpackConfig = {
 		new CopyWebpackPlugin( {
 			patterns: wcAdminPackages.map( ( packageName ) => ( {
 				// Copy css and style.asset.php files.
-				from: `../../packages/js/${ packageName }/build-style/*.{css,php}`,
+				from: `../../../../packages/js/${ packageName }/build-style/*.{css,php}`,
 				to: `./${ packageName }/[name][ext]`,
 				noErrorOnMissing: true,
 				// Overwrites files already in compilation.assets to ensure we use the assets from the build-style.
@@ -220,7 +220,7 @@ const webpackConfig = {
 		new CopyWebpackPlugin( {
 			patterns: [
 				{
-					from: '../../packages/js/product-editor/build/blocks',
+					from: '../../../../packages/js/product-editor/build/blocks',
 					to: './product-editor/blocks',
 				},
 			],
