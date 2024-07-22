@@ -76,4 +76,8 @@ module.exports = {
 	testEnvironment: 'jest-environment-jsdom',
 	timers: 'modern',
 	verbose: true,
+	cacheDirectory: path.resolve(
+		__dirname,
+		'../../../node_modules/.cache/jest'
+	),
 };
