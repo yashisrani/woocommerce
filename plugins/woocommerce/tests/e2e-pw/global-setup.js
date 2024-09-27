@@ -1,6 +1,5 @@
-const { chromium, expect } = require( '@playwright/test' );
+const { chromium, expect, request } = require( '@playwright/test' );
 const { admin, customer } = require( './test-data/data' );
-const axios = require( 'axios' );
 const fs = require( 'fs' );
 const { site } = require( './utils' );
 const { logIn } = require( './utils/login' );
@@ -20,14 +19,15 @@ module.exports = async ( config ) => {
 	if ( ! baseURL.includes( 'locahost' ) ) {
 		console.log( 'Resetting site...' );
 		try {
-			const response = await axios.get(
+			const reset = await request.newContext();
+			const response = await reset.get(
 				`${ baseURL }/wp-json/wc-cleanup/v1/reset?key=FUFP2UrAbJa_.GMfs*nXne*9Fq7abvYv`
 			);
-			console.log( 'Reset successful:', response.data );
+			console.log( 'Reset successful:', response.status() );
 		} catch ( error ) {
 			console.error(
 				'Reset failed:',
-				error.response ? error.response.data : error.message
+				error.response ? error.response.status() : error.message
 			);
 		}
 	}
