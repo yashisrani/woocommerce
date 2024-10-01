@@ -21,25 +21,30 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 function wc_cleanup_media() {
 	$args = array(
-		'post_type'      => 'attachment',
-		'posts_per_page' => -1,
-		'post_status'    => 'any',
-		'fields'         => 'ids',
+		'post_type'   => 'attachment',
+		'numberposts' => -1,
+		'post_status' => null,
+		'post_parent' => null,
 	);
 
-	$attachment_ids      = get_posts( $args );
+	$attachments         = get_posts( $args );
 	$excluded_file_names = array( 'image-01', 'image-02', 'image-03' );
 
-	foreach ( $attachment_ids as $attachment_id ) {
-		$file_name = pathinfo( get_attached_file( $attachment_id ), PATHINFO_FILENAME );
-		if ( ! in_array( $file_name, $excluded_file_names, true ) ) {
-			wp_delete_attachment( $attachment_id, true );
+	if ( $attachments ) {
+		foreach ( $attachments as $attachment ) {
+			$file_name = pathinfo( get_attached_file( $attachment->ID ), PATHINFO_FILENAME );
+			if ( ! in_array( $file_name, $excluded_file_names, true ) ) {
+				wp_delete_attachment( $attachment->ID, true );
+			}
 		}
 	}
 
-	// Clean up the uploads directory.
+	// Clean up the uploads directory, including CSV files.
 	$upload_dir = wp_upload_dir();
 	wc_cleanup_directory( $upload_dir['basedir'], $excluded_file_names );
+
+	// Specifically target and remove CSV files.
+	wc_cleanup_csv_files( $upload_dir['basedir'] );
 }
 
 /**
@@ -68,8 +73,8 @@ function wc_cleanup_directory( $dir, $excluded_file_names = array() ) {
 		}
 	}
 
-	// Only remove directory if it's empty and not the base upload directory.
-	if ( wp_upload_dir()['basedir'] !== $dir && count( scandir( $dir ) ) <= 2 ) {
+	// Remove the empty directory if it's not the base upload directory.
+	if ( wp_upload_dir()['basedir'] !== $dir ) {
 		if ( function_exists( 'wp_delete_directory' ) ) {
 			wp_delete_directory( $dir );
 		} elseif ( function_exists( 'WP_Filesystem' ) ) {
@@ -153,16 +158,29 @@ function wc_cleanup_reset_site() {
 	}
 
 	// Remove all orders.
-	$orders      = get_posts(
-		array(
-			'post_type'      => 'shop_order',
-			'posts_per_page' => -1,
-			'post_status'    => 'any',
-		)
-	);
-	$order_count = count( $orders );
-	foreach ( $orders as $order ) {
-		$result = wp_delete_post( $order->ID, true );
+	if ( wc_get_container()->get( Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController::class )->custom_orders_table_usage_is_enabled() ) {
+		// HPOS is enabled
+		global $wpdb;
+		$table_name = $wpdb->prefix . 'wc_orders';
+		$order_ids = $wpdb->get_col( "SELECT id FROM {$table_name}" );
+
+		foreach ( $order_ids as $order_id ) {
+			$order = wc_get_order( $order_id );
+			if ( $order ) {
+				$order->delete( true );
+			}
+		}
+	} else {
+		// Traditional post-based orders
+		$orders = get_posts(
+			array(
+				'post_type'   => 'shop_order',
+				'numberposts' => -1,
+			)
+		);
+		foreach ( $orders as $order ) {
+			wp_delete_post( $order->ID, true );
+		}
 	}
 
 	// Remove all products.
@@ -217,6 +235,10 @@ function wc_cleanup_reset_site() {
 		// Set the active theme to Twenty Twenty-Three.
 		switch_theme( 'twentytwentythree' );
 	}
+
+	// Clean up the WooCommerce analytics tables.
+	wc_cleanup_analytics_table( 'wc_order_stats' );
+	wc_cleanup_analytics_table( 'wc_customer_lookup' );
 
 	// Remove all taxes.
 	wc_cleanup_taxes();
@@ -340,11 +362,15 @@ add_action(
 				'methods'             => 'GET',
 				'callback'            => 'wc_cleanup_reset_site_via_api',
 				'permission_callback' => function () {
-					// phpcs:disable WordPress.Security.NonceVerification.Recommended
-					$provided_key = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
-						$valid_key    = 'FUFP2UrAbJa_.GMfs*nXne*9Fq7abvYv'; // Replace with your actual secret key.
-						// phpcs:enable WordPress.Security.NonceVerification.Recommended
-						return $provided_key === $valid_key;
+					$auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+					$credentials = base64_decode( substr( $auth_header, 6 ) );
+					list( $username, $password ) = explode( ':', $credentials, 2 );
+					$user = wp_authenticate( $username, $password );
+					if ( is_wp_error( $user ) || ! user_can( $user, 'manage_woocommerce' ) ) {
+						return new WP_Error( 'forbidden', 'Unauthorized', array( 'status' => 403 ) );
+					}
+
+					return true;
 				},
 			)
 		);
@@ -352,11 +378,27 @@ add_action(
 );
 
 /**
- * Reset the site via API call.
+ * Reset the WooCommerce site via API.
  *
  * @return WP_REST_Response
  */
 function wc_cleanup_reset_site_via_api() {
 	wc_cleanup_reset_site();
-	return new WP_REST_Response( array( 'message' => 'Site reset successfully' ), 200 );
+	return new WP_REST_Response( 'WooCommerce site has been reset.', 200 );
+}
+
+// Add this new function to handle CSV file cleanup
+function wc_cleanup_csv_files( $dir ) {
+	$files = glob( $dir . '/*.csv' );
+	foreach ( $files as $file ) {
+		if ( is_file( $file ) ) {
+			unlink( $file );
+		}
+	}
+
+	// Recursively search subdirectories for CSV files
+	$subdirs = glob( $dir . '/*', GLOB_ONLYDIR );
+	foreach ( $subdirs as $subdir ) {
+		wc_cleanup_csv_files( $subdir );
+	}
 }
