@@ -159,10 +159,10 @@ function wc_cleanup_reset_site() {
 
 	// Remove all orders.
 	if ( wc_get_container()->get( Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController::class )->custom_orders_table_usage_is_enabled() ) {
-		// HPOS is enabled
+		// HPOS is enabled.
 		global $wpdb;
 		$table_name = $wpdb->prefix . 'wc_orders';
-		$order_ids = $wpdb->get_col( "SELECT id FROM {$table_name}" );
+		$order_ids  = $wpdb->get_col( $wpdb->prepare( 'SELECT id FROM %i', $table_name ) );
 
 		foreach ( $order_ids as $order_id ) {
 			$order = wc_get_order( $order_id );
@@ -171,7 +171,7 @@ function wc_cleanup_reset_site() {
 			}
 		}
 	} else {
-		// Traditional post-based orders
+		// Traditional post-based orders.
 		$orders = get_posts(
 			array(
 				'post_type'   => 'shop_order',
@@ -362,15 +362,19 @@ add_action(
 				'methods'             => 'GET',
 				'callback'            => 'wc_cleanup_reset_site_via_api',
 				'permission_callback' => function () {
-					$auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-					$credentials = base64_decode( substr( $auth_header, 6 ) );
-					list( $username, $password ) = explode( ':', $credentials, 2 );
-					$user = wp_authenticate( $username, $password );
-					if ( is_wp_error( $user ) || ! user_can( $user, 'manage_woocommerce' ) ) {
-						return new WP_Error( 'forbidden', 'Unauthorized', array( 'status' => 403 ) );
+					$auth_header = isset( $_SERVER['HTTP_AUTHORIZATION'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_AUTHORIZATION'] ) ) : '';
+					if ( strpos( $auth_header, 'Basic ' ) === 0 ) {
+						$auth_header = substr( $auth_header, 6 );
+						$credentials = explode( ':', base64_decode( $auth_header ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+						$user = wp_authenticate( $credentials[0], $credentials[1] );
+						if ( is_wp_error( $user ) || ! user_can( $user, 'manage_woocommerce' ) ) {
+							return new WP_Error( 'forbidden', 'Unauthorized', array( 'status' => 403 ) );
+						}
+
+						return true;
 					}
 
-					return true;
+					return new WP_Error( 'forbidden', 'Unauthorized', array( 'status' => 403 ) );
 				},
 			)
 		);
@@ -387,16 +391,20 @@ function wc_cleanup_reset_site_via_api() {
 	return new WP_REST_Response( 'WooCommerce site has been reset.', 200 );
 }
 
-// Add this new function to handle CSV file cleanup
+/**
+ * Clean up CSV files in the given directory.
+ *
+ * @param string $dir The directory to clean up.
+ */
 function wc_cleanup_csv_files( $dir ) {
 	$files = glob( $dir . '/*.csv' );
 	foreach ( $files as $file ) {
 		if ( is_file( $file ) ) {
-			unlink( $file );
+			wp_delete_file( $file );
 		}
 	}
 
-	// Recursively search subdirectories for CSV files
+	// Recursively search subdirectories for CSV files.
 	$subdirs = glob( $dir . '/*', GLOB_ONLYDIR );
 	foreach ( $subdirs as $subdir ) {
 		wc_cleanup_csv_files( $subdir );
