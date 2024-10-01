@@ -16,12 +16,20 @@ module.exports = async ( config ) => {
 	console.log( `Base URL: ${ baseURL }` );
 
 	// Try calling the site reset plugin (if testing on an external environment)
-	if ( ! baseURL.includes( 'locahost' ) ) {
+	if ( ! baseURL.includes( 'localhost' ) ) {
 		console.log( 'Resetting site...' );
 		try {
 			const reset = await request.newContext();
+			const credentials = Buffer.from(
+				`${ admin.username }:${ admin.password }`
+			).toString( 'base64' );
 			const response = await reset.get(
-				`${ baseURL }/wp-json/wc-cleanup/v1/reset?key=FUFP2UrAbJa_.GMfs*nXne*9Fq7abvYv`
+				`${ baseURL }/wp-json/wc-cleanup/v1/reset`,
+				{
+					headers: {
+						Authorization: `Basic ${ credentials }`,
+					},
+				}
 			);
 			console.log( 'Reset successful:', response.status() );
 		} catch ( error ) {
