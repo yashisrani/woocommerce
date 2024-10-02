@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WooCommerce Cleanup
  * Description: Resets WooCommerce site to testing start state.
- * Version: 1.0
+ * Version: 1.1
  * Author: Solaris Team
  * @package WooCommerceCleanup
  *
@@ -154,6 +154,19 @@ function wc_cleanup_reset_site() {
 		)
 	);
 	foreach ( $coupons as $coupon ) {
+		wp_delete_post( $coupon->ID, true );
+	}
+
+	// Remove all coupons that are in the trash.
+	$trash_coupons = get_posts(
+		array(
+			'post_type'   => 'shop_coupon',
+			'post_status' => 'trash',
+			'numberposts' => -1,
+		)
+	);
+
+	foreach ( $trash_coupons as $coupon ) {
 		wp_delete_post( $coupon->ID, true );
 	}
 
