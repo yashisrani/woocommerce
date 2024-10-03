@@ -2,8 +2,10 @@
 /**
  * Plugin Name: WooCommerce Cleanup
  * Description: Resets WooCommerce site to testing start state.
- * Version: 1.1
+ * Version: 1.3
  * Author: Solaris Team
+ * Requires at least: 6.6
+ * Requires PHP: 8.0
  * @package WooCommerceCleanup
  *
  * This file contains the main functionality for the WooCommerce Cleanup plugin.
@@ -405,15 +407,31 @@ function wc_cleanup_reset_site_via_api() {
 }
 
 /**
- * Clean up CSV files in the given directory.
+ * Clean up CSV files in the given directory and remove them from the media library.
  *
  * @param string $dir The directory to clean up.
  */
 function wc_cleanup_csv_files( $dir ) {
+	global $wpdb;
 	$files = glob( $dir . '/*.csv' );
 	foreach ( $files as $file ) {
 		if ( is_file( $file ) ) {
-			wp_delete_file( $file );
+			// Get the attachment ID by file path.
+			$relative_path = str_replace( wp_upload_dir()['basedir'] . '/', '', $file );
+			$attachment_id = $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT post_id FROM $wpdb->postmeta WHERE meta_key = '_wp_attached_file' AND meta_value = %s",
+					$relative_path
+				)
+			);
+
+			if ( $attachment_id ) {
+				// If found in media library, delete the attachment.
+				wp_delete_attachment( $attachment_id, true );
+			} else {
+				// If not found in media library, just delete the file.
+				wp_delete_file( $file );
+			}
 		}
 	}
 
@@ -422,4 +440,15 @@ function wc_cleanup_csv_files( $dir ) {
 	foreach ( $subdirs as $subdir ) {
 		wc_cleanup_csv_files( $subdir );
 	}
+
+	// Clean up any orphaned database entries for CSV files
+	$wpdb->query(
+		"
+        DELETE p, pm
+        FROM $wpdb->posts p
+        LEFT JOIN $wpdb->postmeta pm ON p.ID = pm.post_id
+        WHERE p.post_type = 'attachment'
+        AND p.post_mime_type = 'text/csv'
+    "
+	);
 }
