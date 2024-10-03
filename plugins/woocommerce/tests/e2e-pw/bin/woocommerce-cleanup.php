@@ -441,7 +441,7 @@ function wc_cleanup_csv_files( $dir ) {
 		wc_cleanup_csv_files( $subdir );
 	}
 
-	// Clean up any orphaned database entries for CSV files
+	// Clean up any orphaned database entries for CSV files.
 	$wpdb->query(
 		"
         DELETE p, pm
