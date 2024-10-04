@@ -4,13 +4,12 @@
 import { store, getContext, getElement } from '@woocommerce/interactivity';
 import { formatPrice, getCurrency } from '@woocommerce/price-format';
 import { HTMLElementEvent } from '@woocommerce/types';
+import { debounce } from '@woocommerce/base-utils';
 
-type PriceFilterContext = {
-	minPrice: number;
-	maxPrice: number;
-	minRange: number;
-	maxRange: number;
-};
+/**
+ * Internal dependencies
+ */
+import { PriceFilterContext } from '../price-filter/frontend';
 
 const constrainRangeSliderValues = (
 	/**
@@ -74,6 +73,51 @@ const constrainRangeSliderValues = (
 	return { minPrice: minValue, maxPrice: maxValue };
 };
 
+const _updateRange = (
+	event: HTMLElementEvent< HTMLInputElement >,
+	context: PriceFilterContext
+) => {
+	const { minPrice, maxPrice, minRange, maxRange } = context;
+	const isMin = event.target.classList.contains( 'min' );
+	const targetValue = Number( event.target.value );
+	const stepValue = 1;
+	const currentValues: [ number, number ] = isMin
+		? [ Math.round( targetValue / stepValue ) * stepValue, maxPrice ]
+		: [ minPrice, Math.round( targetValue / stepValue ) * stepValue ];
+	const values = constrainRangeSliderValues(
+		currentValues,
+		minRange,
+		maxRange,
+		stepValue,
+		isMin
+	);
+
+	if ( targetValue >= maxPrice ) {
+		context.maxPrice = minPrice + 1;
+	} else if ( targetValue <= minPrice ) {
+		context.minPrice = maxPrice - 1;
+	}
+
+	if ( isMin ) {
+		context.minPrice = values.minPrice;
+	} else {
+		context.maxPrice = values.maxPrice;
+	}
+
+	setTimeout( () => {
+		event.target.dispatchEvent( new Event( 'change' ) );
+	}, 100 );
+};
+const _debounceUpdateRange = debounce(
+	(
+		event: HTMLElementEvent< HTMLInputElement >,
+		context: PriceFilterContext
+	) => {
+		_updateRange( event, context );
+	},
+	500
+);
+
 store( 'woocommerce/product-filter-price-slider', {
 	state: {
 		rangeStyle: () => {
@@ -104,38 +148,13 @@ store( 'woocommerce/product-filter-price-slider', {
 		},
 		updateRange: ( event: HTMLElementEvent< HTMLInputElement > ) => {
 			const context = getContext< PriceFilterContext >();
-			const { minPrice, maxPrice, minRange, maxRange } = context;
-			const isMin = event.target.classList.contains( 'min' );
-			const targetValue = Number( event.target.value );
-			const stepValue = 1;
-			const currentValues: [ number, number ] = isMin
-				? [
-						Math.round( targetValue / stepValue ) * stepValue,
-						maxPrice,
-				  ]
-				: [
-						minPrice,
-						Math.round( targetValue / stepValue ) * stepValue,
-				  ];
-			const values = constrainRangeSliderValues(
-				currentValues,
-				minRange,
-				maxRange,
-				stepValue,
-				isMin
-			);
-
-			if ( targetValue >= maxPrice ) {
-				context.maxPrice = minPrice + 1;
-			} else if ( targetValue <= minPrice ) {
-				context.minPrice = maxPrice - 1;
-			}
-
-			if ( isMin ) {
-				context.minPrice = values.minPrice;
-			} else {
-				context.maxPrice = values.maxPrice;
-			}
+			_updateRange( event, context );
+		},
+		debounceUpdateRange: (
+			event: HTMLElementEvent< HTMLInputElement >
+		) => {
+			const context = getContext< PriceFilterContext >();
+			_debounceUpdateRange( event, context );
 		},
 	},
 } );
