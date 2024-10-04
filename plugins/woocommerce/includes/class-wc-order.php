@@ -6,6 +6,8 @@
  * @version 2.2.0
  */
 
+use Automattic\WooCommerce\Internal\CostOfGoodsSold\CogsAwareTrait;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -14,6 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * These are regular WooCommerce orders, which extend the abstract order class.
  */
 class WC_Order extends WC_Abstract_Order {
+    use CogsAwareTrait;
 
 	/**
 	 * Stores data about status changes so relevant hooks can be fired.
@@ -90,6 +93,8 @@ class WC_Order extends WC_Abstract_Order {
 		'new_order_email_sent'         => false,
 		'recorded_sales'               => false,
 		'recorded_coupon_usage_counts' => false,
+
+        'cogs_total_value' => 0
 	);
 
 	/**
@@ -2357,4 +2362,36 @@ class WC_Order extends WC_Abstract_Order {
 	public function untrash(): bool {
 		return (bool) $this->data_store->untrash_order( $this );
 	}
+
+    public function set_cogs_total_value( float $value ) {
+        $this->set_prop( 'cogs_total_value', $value );
+    }
+
+    public function get_cogs_total_value( $context = 'view' ) {
+        return $this->get_prop( 'cogs_total_value', $context );
+    }
+
+    public function calculate_cogs_total_value(bool $set_calculated_value = true): float {
+        return $this->cogs_is_enabled(__CLASS__ . '::' . __METHOD__) ? $this->calculate_cogs_total_value_core($set_calculated_value) : 0;
+    }
+
+    public function foobar() {return 34;}
+
+    protected function calculate_cogs_total_value_core(bool $set_calculated_value = true): float {
+        $value = 0;
+        foreach(array_keys($this->item_types_to_group) as $item_type) {
+            $order_items = $this->get_items($item_type);
+            foreach($order_items as $item) {
+                if($item->has_cogs()) {
+                    $value += $item->get_cogs_value();
+                }
+            }
+        }
+
+        if($set_calculated_value) {
+            $this->set_cogs_total_value($value);
+        }
+
+        return $value;
+    }
 }

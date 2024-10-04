@@ -611,7 +611,68 @@ abstract class WC_Data {
 		}
 	}
 
-	/**
+    /**
+     * Update Meta Data in the database.
+     *
+     * @since 2.6.0
+     */
+    public function save_meta_data() {
+        if ( ! $this->data_store || is_null( $this->meta_data ) ) {
+            return;
+        }
+        foreach ( $this->meta_data as $array_key => $meta ) {
+            if ( is_null( $meta->value ) ) {
+                if ( ! empty( $meta->id ) ) {
+                    $this->data_store->delete_meta( $this, $meta );
+                    /**
+                     * Fires immediately after deleting metadata.
+                     *
+                     * @param int    $meta_id    ID of deleted metadata entry.
+                     * @param int    $object_id  Object ID.
+                     * @param string $meta_key   Metadata key.
+                     * @param mixed  $meta_value Metadata value (will be empty for delete).
+                     */
+                    do_action( "deleted_{$this->object_type}_meta", $meta->id, $this->get_id(), $meta->key, $meta->value );
+
+                    unset( $this->meta_data[ $array_key ] );
+                }
+            } elseif ( empty( $meta->id ) ) {
+                $meta->id = $this->data_store->add_meta( $this, $meta );
+                /**
+                 * Fires immediately after adding metadata.
+                 *
+                 * @param int    $meta_id    ID of added metadata entry.
+                 * @param int    $object_id  Object ID.
+                 * @param string $meta_key   Metadata key.
+                 * @param mixed  $meta_value Metadata value.
+                 */
+                do_action( "added_{$this->object_type}_meta", $meta->id, $this->get_id(), $meta->key, $meta->value );
+
+                $meta->apply_changes();
+            } else {
+                if ( $meta->get_changes() ) {
+                    $this->data_store->update_meta( $this, $meta );
+                    /**
+                     * Fires immediately after updating metadata.
+                     *
+                     * @param int    $meta_id    ID of updated metadata entry.
+                     * @param int    $object_id  Object ID.
+                     * @param string $meta_key   Metadata key.
+                     * @param mixed  $meta_value Metadata value.
+                     */
+                    do_action( "updated_{$this->object_type}_meta", $meta->id, $this->get_id(), $meta->key, $meta->value );
+
+                    $meta->apply_changes();
+                }
+            }
+        }
+        if ( ! empty( $this->cache_group ) ) {
+            $cache_key = self::generate_meta_cache_key( $this->get_id(), $this->cache_group );
+            wp_cache_delete( $cache_key, $this->cache_group );
+        }
+    }
+
+    /**
 	 * Read Meta Data from the database. Ignore any internal properties.
 	 * Uses it's own caches because get_metadata does not provide meta_ids.
 	 *
@@ -653,7 +714,7 @@ abstract class WC_Data {
 		}
 	}
 
-	/**
+    /**
 	 * Helper function to initialize metadata entries from filtered raw meta data.
 	 *
 	 * @param array $filtered_meta_data Filtered metadata fetched from DB.
@@ -668,67 +729,6 @@ abstract class WC_Data {
 					'value' => maybe_unserialize( $meta->meta_value ),
 				)
 			);
-		}
-	}
-
-	/**
-	 * Update Meta Data in the database.
-	 *
-	 * @since 2.6.0
-	 */
-	public function save_meta_data() {
-		if ( ! $this->data_store || is_null( $this->meta_data ) ) {
-			return;
-		}
-		foreach ( $this->meta_data as $array_key => $meta ) {
-			if ( is_null( $meta->value ) ) {
-				if ( ! empty( $meta->id ) ) {
-					$this->data_store->delete_meta( $this, $meta );
-					/**
-					 * Fires immediately after deleting metadata.
-					 *
-					 * @param int    $meta_id    ID of deleted metadata entry.
-					 * @param int    $object_id  Object ID.
-					 * @param string $meta_key   Metadata key.
-					 * @param mixed  $meta_value Metadata value (will be empty for delete).
-					 */
-					do_action( "deleted_{$this->object_type}_meta", $meta->id, $this->get_id(), $meta->key, $meta->value );
-
-					unset( $this->meta_data[ $array_key ] );
-				}
-			} elseif ( empty( $meta->id ) ) {
-				$meta->id = $this->data_store->add_meta( $this, $meta );
-				/**
-				 * Fires immediately after adding metadata.
-				 *
-				 * @param int    $meta_id    ID of added metadata entry.
-				 * @param int    $object_id  Object ID.
-				 * @param string $meta_key   Metadata key.
-				 * @param mixed  $meta_value Metadata value.
-				 */
-				do_action( "added_{$this->object_type}_meta", $meta->id, $this->get_id(), $meta->key, $meta->value );
-
-				$meta->apply_changes();
-			} else {
-				if ( $meta->get_changes() ) {
-					$this->data_store->update_meta( $this, $meta );
-					/**
-					 * Fires immediately after updating metadata.
-					 *
-					 * @param int    $meta_id    ID of updated metadata entry.
-					 * @param int    $object_id  Object ID.
-					 * @param string $meta_key   Metadata key.
-					 * @param mixed  $meta_value Metadata value.
-					 */
-					do_action( "updated_{$this->object_type}_meta", $meta->id, $this->get_id(), $meta->key, $meta->value );
-
-					$meta->apply_changes();
-				}
-			}
-		}
-		if ( ! empty( $this->cache_group ) ) {
-			$cache_key = self::generate_meta_cache_key( $this->get_id(), $this->cache_group );
-			wp_cache_delete( $cache_key, $this->cache_group );
 		}
 	}
 

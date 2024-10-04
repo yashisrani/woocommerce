@@ -505,4 +505,14 @@ class WC_Order_Item_Product extends WC_Order_Item {
 		}
 		return parent::offsetExists( $offset );
 	}
+
+	public function has_cogs(): bool {
+		return true;
+	}
+
+	public function calculate_cogs_value_core(): float {
+		$product = $this->get_product();
+		$cogs_per_unit = $product->get_cogs_total_value();
+		return $cogs_per_unit * $this->get_quantity();
+	}
 }

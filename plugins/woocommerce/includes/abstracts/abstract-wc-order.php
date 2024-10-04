@@ -852,16 +852,18 @@ abstract class WC_Abstract_Order extends WC_Abstract_Legacy_Order {
 	protected function type_to_group( $type ) {
 		$type_to_group = apply_filters(
 			'woocommerce_order_type_to_group',
-			array(
-				'line_item' => 'line_items',
-				'tax'       => 'tax_lines',
-				'shipping'  => 'shipping_lines',
-				'fee'       => 'fee_lines',
-				'coupon'    => 'coupon_lines',
-			)
+			$this->item_types_to_group
 		);
-		return isset( $type_to_group[ $type ] ) ? $type_to_group[ $type ] : '';
+		return $type_to_group[$type] ?? '';
 	}
+
+	protected array $item_types_to_group = array(
+		'line_item' => 'line_items',
+		'tax'       => 'tax_lines',
+		'shipping'  => 'shipping_lines',
+		'fee'       => 'fee_lines',
+		'coupon'    => 'coupon_lines',
+	);
 
 	/**
 	 * Return an array of items/products within this order.

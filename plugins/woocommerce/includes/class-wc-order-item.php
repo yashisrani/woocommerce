@@ -40,7 +40,7 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	 */
 	protected $data = array(
 		'order_id' => 0,
-		'name'     => '',
+		'name'     => ''
 	);
 
 	/**
@@ -81,6 +81,7 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	 * @param int|object|array $item ID to load from the DB, or WC_Order_Item object.
 	 */
 	public function __construct( $item = 0 ) {
+		$this->data['cogs_value']=0;
 		parent::__construct( $item );
 
 		if ( $item instanceof WC_Order_Item ) {
@@ -107,13 +108,7 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 	 * @since 3.2.0
 	 */
 	public function apply_changes() {
-		if ( function_exists( 'array_replace' ) ) {
-			$this->data = array_replace( $this->data, $this->changes ); // phpcs:ignore PHPCompatibility.FunctionUse.NewFunctions.array_replaceFound
-		} else { // PHP 5.2 compatibility.
-			foreach ( $this->changes as $key => $change ) {
-				$this->data[ $key ] = $change;
-			}
-		}
+		$this->data = array_replace( $this->data, $this->changes );
 		$this->changes = array();
 	}
 
@@ -444,4 +439,35 @@ class WC_Order_Item extends WC_Data implements ArrayAccess {
 
 		return null;
 	}
+
+    public function has_cogs(): bool {
+        return false;
+    }
+
+    public function calculate_cogs_value(bool $set_calculated_value = true): float {
+        if(!$this->has_cogs()) {
+			return 0;
+		}
+
+		$value = $this->calculate_cogs_value_core();
+		if($set_calculated_value) {
+			$this->set_cogs_value($value);
+		}
+
+		return $value;
+    }
+
+	protected function calculate_cogs_value_core(): float {
+		return 0;
+	}
+
+    public function get_cogs_value( $context = 'view' ): float {
+        return (float)($this->has_cogs() ? $this->get_prop( 'cogs_value', $context ) : 0);
+    }
+
+    public function set_cogs_value( float $value ): void {
+        if($this->has_cogs()) {
+            $this->set_prop('cogs_value', $value);
+        }
+    }
 }
